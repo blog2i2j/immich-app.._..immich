@@ -1,5 +1,5 @@
 import { Insertable, Kysely } from 'kysely';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { Writable } from 'node:stream';
 import { Assets, DB, Partners, Sessions, Users } from 'src/db';
 import { AuthDto } from 'src/dtos/auth.dto';
@@ -36,6 +36,7 @@ import { VersionHistoryRepository } from 'src/repositories/version-history.repos
 import { ViewRepository } from 'src/repositories/view-repository';
 import { newLoggingRepositoryMock } from 'test/repositories/logger.repository.mock';
 import { newTelemetryRepositoryMock } from 'test/repositories/telemetry.repository.mock';
+import { newUuid } from 'test/small.factory';
 
 class CustomWritable extends Writable {
   private data = '';
@@ -54,12 +55,10 @@ class CustomWritable extends Writable {
   }
 }
 
-type Asset = Insertable<Assets>;
+type Asset = Partial<Insertable<Assets>>;
 type User = Partial<Insertable<Users>>;
 type Session = Omit<Insertable<Sessions>, 'token'> & { token?: string };
 type Partner = Insertable<Partners>;
-
-export const newUuid = () => randomUUID() as string;
 
 export class TestFactory {
   private assets: Asset[] = [];
@@ -161,10 +160,6 @@ export class TestFactory {
   }
 
   async create() {
-    for (const asset of this.assets) {
-      await this.context.createAsset(asset);
-    }
-
     for (const user of this.users) {
       await this.context.createUser(user);
     }
@@ -175,6 +170,10 @@ export class TestFactory {
 
     for (const session of this.sessions) {
       await this.context.createSession(session);
+    }
+
+    for (const asset of this.assets) {
+      await this.context.createAsset(asset);
     }
 
     return this.context;
@@ -213,7 +212,7 @@ export class TestContext {
   versionHistory: VersionHistoryRepository;
   view: ViewRepository;
 
-  private constructor(private db: Kysely<DB>) {
+  private constructor(public db: Kysely<DB>) {
     const logger = newLoggingRepositoryMock() as unknown as LoggingRepository;
     const config = new ConfigRepository();
 
