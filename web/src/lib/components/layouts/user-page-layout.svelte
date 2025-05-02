@@ -3,12 +3,12 @@
 </script>
 
 <script lang="ts">
-  import { openFileUploadDialog } from '$lib/utils/file-uploader';
-  import NavigationBar from '../shared-components/navigation-bar/navigation-bar.svelte';
-  import SideBar from '../shared-components/side-bar/side-bar.svelte';
-  import AdminSideBar from '../shared-components/side-bar/admin-side-bar.svelte';
   import { useActions, type ActionArray } from '$lib/actions/use-actions';
+  import { openFileUploadDialog } from '$lib/utils/file-uploader';
   import type { Snippet } from 'svelte';
+  import NavigationBar from '../shared-components/navigation-bar/navigation-bar.svelte';
+  import AdminSideBar from '../shared-components/side-bar/admin-side-bar.svelte';
+  import SideBar from '../shared-components/side-bar/side-bar.svelte';
 
   interface Props {
     hideNavbar?: boolean;

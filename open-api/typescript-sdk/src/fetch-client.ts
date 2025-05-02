@@ -223,6 +223,11 @@ export type UserPreferencesUpdateDto = {
     sharedLinks?: SharedLinksUpdate;
     tags?: TagsUpdate;
 };
+export type AssetStatsResponseDto = {
+    images: number;
+    total: number;
+    videos: number;
+};
 export type AlbumUserResponseDto = {
     role: AlbumUserRole;
     user: UserResponseDto;
@@ -461,11 +466,6 @@ export type CheckExistingAssetsResponseDto = {
 export type AssetJobsDto = {
     assetIds: string[];
     name: AssetJobName;
-};
-export type AssetStatsResponseDto = {
-    images: number;
-    total: number;
-    videos: number;
 };
 export type UpdateAssetDto = {
     dateTimeOriginal?: string;
@@ -1496,13 +1496,15 @@ export function sendTestEmailAdmin({ systemConfigSmtpDto }: {
         body: systemConfigSmtpDto
     })));
 }
-export function searchUsersAdmin({ withDeleted }: {
+export function searchUsersAdmin({ id, withDeleted }: {
+    id?: string;
     withDeleted?: boolean;
 }, opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
         status: 200;
         data: UserAdminResponseDto[];
     }>(`/admin/users${QS.query(QS.explode({
+        id,
         withDeleted
     }))}`, {
         ...opts
@@ -1588,6 +1590,23 @@ export function restoreUserAdmin({ id }: {
     }>(`/admin/users/${encodeURIComponent(id)}/restore`, {
         ...opts,
         method: "POST"
+    }));
+}
+export function getUserStatisticsAdmin({ id, isArchived, isFavorite, isTrashed }: {
+    id: string;
+    isArchived?: boolean;
+    isFavorite?: boolean;
+    isTrashed?: boolean;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: AssetStatsResponseDto;
+    }>(`/admin/users/${encodeURIComponent(id)}/statistics${QS.query(QS.explode({
+        isArchived,
+        isFavorite,
+        isTrashed
+    }))}`, {
+        ...opts
     }));
 }
 export function getAllAlbums({ assetId, shared }: {
