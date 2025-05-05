@@ -421,7 +421,7 @@
   <!-- Asset Viewer -->
   <div class="z-[-1] relative col-start-1 col-span-4 row-start-1 row-span-full" bind:this={assetViewerHtmlElement}>
     {#if $slideshowState != SlideshowState.None}
-      <div class="z-1 absolute w-full flex">
+      <div class="z-10 absolute w-full flex">
         <SlideshowBar
           {isFullScreen}
           onSetToFullScreen={() => assetViewerHtmlElement?.requestFullscreen?.()}
