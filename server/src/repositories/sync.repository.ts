@@ -7,8 +7,8 @@ import { DummyValue, GenerateSql } from 'src/decorators';
 import { SyncEntityType } from 'src/enum';
 import { SyncAck } from 'src/types';
 
-type auditTables = 'users_audit' | 'partners_audit' | 'assets_audit';
-type upsertTables = 'users' | 'partners' | 'assets' | 'exif';
+type AuditTables = 'users_audit' | 'partners_audit' | 'assets_audit' | 'albums_audit';
+type UpsertTables = 'users' | 'partners' | 'assets' | 'exif' | 'albums';
 
 @Injectable()
 export class SyncRepository {
@@ -154,19 +154,52 @@ export class SyncRepository {
       .stream();
   }
 
-  private auditTableFilters<T extends keyof Pick<DB, auditTables>, D>(qb: SelectQueryBuilder<DB, T, D>, ack?: SyncAck) {
-    const builder = qb as SelectQueryBuilder<DB, auditTables, D>;
+  @GenerateSql({ params: [DummyValue.UUID], stream: true })
+  getAlbumDeletes(userId: string, ack?: SyncAck) {
+    return this.db
+      .selectFrom('albums_audit')
+      .select(['id', 'albumId'])
+      .where('ownerId', '=', userId)
+      .$if(!!ack, (qb) => qb.where('id', '>', ack!.updateId))
+      .$call((qb) => this.auditTableFilters(qb, ack))
+      .stream();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID], stream: true })
+  getAlbumUpserts(userId: string, ack?: SyncAck) {
+    return this.db
+      .selectFrom('albums')
+      .$call((qb) => this.upsertTableFilters(qb, ack))
+      .leftJoin('albums_shared_users_users as album_users', 'albums.id', 'album_users.albumsId')
+      .where((eb) => eb.or([eb('albums.ownerId', '=', userId), eb('album_users.usersId', '=', userId)]))
+      .select([
+        'albums.id',
+        'albums.ownerId',
+        'albums.albumName as name',
+        'albums.description',
+        'albums.createdAt',
+        'albums.updatedAt',
+        'albums.albumThumbnailAssetId as thumbnailAssetId',
+        'albums.isActivityEnabled',
+        'albums.order',
+        'albums.updateId',
+      ])
+      .stream();
+  }
+
+  private auditTableFilters<T extends keyof Pick<DB, AuditTables>, D>(qb: SelectQueryBuilder<DB, T, D>, ack?: SyncAck) {
+    const builder = qb as SelectQueryBuilder<DB, AuditTables, D>;
     return builder
       .where('deletedAt', '<', sql.raw<Date>("now() - interval '1 millisecond'"))
       .$if(!!ack, (qb) => qb.where('id', '>', ack!.updateId))
       .orderBy('id', 'asc') as SelectQueryBuilder<DB, T, D>;
   }
 
-  private upsertTableFilters<T extends keyof Pick<DB, upsertTables>, D>(
+  private upsertTableFilters<T extends keyof Pick<DB, UpsertTables>, D>(
     qb: SelectQueryBuilder<DB, T, D>,
     ack?: SyncAck,
   ) {
-    const builder = qb as SelectQueryBuilder<DB, upsertTables, D>;
+    const builder = qb as SelectQueryBuilder<DB, UpsertTables, D>;
     return builder
       .where('updatedAt', '<', sql.raw<Date>("now() - interval '1 millisecond'"))
       .$if(!!ack, (qb) => qb.where('updateId', '>', ack!.updateId))

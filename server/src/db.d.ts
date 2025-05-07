@@ -74,6 +74,13 @@ export interface Albums {
   updateId: Generated<string>;
 }
 
+export interface AlbumsAudit {
+  deletedAt: Generated<Timestamp>;
+  id: Generated<string>;
+  albumId: string;
+  ownerId: string;
+}
+
 export interface AlbumsAssetsAssets {
   albumsId: string;
   assetsId: string;
@@ -463,6 +470,7 @@ export interface VersionHistory {
 export interface DB {
   activity: Activity;
   albums: Albums;
+  albums_audit: AlbumsAudit;
   albums_assets_assets: AlbumsAssetsAssets;
   albums_shared_users_users: AlbumsSharedUsersUsers;
   api_keys: ApiKeys;

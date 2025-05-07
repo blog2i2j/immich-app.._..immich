@@ -4,9 +4,10 @@ import { DateTime } from 'luxon';
 import { createHash, randomBytes } from 'node:crypto';
 import { Writable } from 'node:stream';
 import { AssetFace } from 'src/database';
-import { AssetJobStatus, Assets, DB, FaceSearch, Person, Sessions } from 'src/db';
+import { Albums, AssetJobStatus, Assets, DB, FaceSearch, Person, Sessions } from 'src/db';
 import { AssetType, AssetVisibility, SourceType } from 'src/enum';
 import { ActivityRepository } from 'src/repositories/activity.repository';
+import { AlbumUserRepository } from 'src/repositories/album-user.repository';
 import { AlbumRepository } from 'src/repositories/album.repository';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository';
 import { AssetRepository } from 'src/repositories/asset.repository';
@@ -39,6 +40,7 @@ const sha256 = (value: string) => createHash('sha256').update(value).digest('bas
 type RepositoriesTypes = {
   activity: ActivityRepository;
   album: AlbumRepository;
+  albumUser: AlbumUserRepository;
   asset: AssetRepository;
   assetJob: AssetJobRepository;
   config: ConfigRepository;
@@ -123,6 +125,14 @@ export const getRepository = <K extends keyof RepositoriesTypes>(key: K, db: Kys
   switch (key) {
     case 'activity': {
       return new ActivityRepository(db);
+    }
+
+    case 'album': {
+      return new AlbumRepository(db);
+    }
+
+    case 'albumUser': {
+      return new AlbumUserRepository(db);
     }
 
     case 'asset': {
@@ -380,6 +390,19 @@ const assetInsert = (asset: Partial<Insertable<Assets>> = {}) => {
   };
 };
 
+const albumInsert = (album: Partial<Insertable<Albums>> & { ownerId: string }) => {
+  const id = album.id || newUuid();
+  const defaults: Omit<Insertable<Albums>, 'ownerId'> = {
+    albumName: 'Album',
+  };
+
+  return {
+    ...defaults,
+    ...album,
+    id,
+  };
+};
+
 const faceInsert = (face: Partial<Insertable<FaceSearch>> & { faceId: string }) => {
   const defaults = {
     faceId: face.faceId,
@@ -502,6 +525,7 @@ export const mediumFactory = {
   assetInsert,
   assetFaceInsert,
   assetJobStatusInsert,
+  albumInsert,
   faceInsert,
   personInsert,
   sessionInsert,

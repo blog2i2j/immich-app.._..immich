@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEnum, IsInt, IsPositive, IsString } from 'class-validator';
 import { AssetResponseDto } from 'src/dtos/asset-response.dto';
-import { AssetType, AssetVisibility, SyncEntityType, SyncRequestType } from 'src/enum';
+import { AssetOrder, AssetType, AssetVisibility, SyncEntityType, SyncRequestType } from 'src/enum';
 import { Optional, ValidateDate, ValidateUUID } from 'src/validation';
 
 export class AssetFullSyncDto {
@@ -112,6 +112,23 @@ export class SyncAssetExifV1 {
   fps!: number | null;
 }
 
+export class SyncAlbumDeleteV1 {
+  albumId!: string;
+}
+
+export class SyncAlbumV1 {
+  id!: string;
+  ownerId!: string;
+  name!: string;
+  description!: string;
+  createdAt!: Date;
+  updatedAt!: Date;
+  thumbnailAssetId!: string | null;
+  isActivityEnabled!: boolean;
+  @ApiProperty({ enumName: 'AssetOrder', enum: AssetOrder })
+  order!: AssetOrder;
+}
+
 export type SyncItem = {
   [SyncEntityType.UserV1]: SyncUserV1;
   [SyncEntityType.UserDeleteV1]: SyncUserDeleteV1;
@@ -123,10 +140,11 @@ export type SyncItem = {
   [SyncEntityType.PartnerAssetV1]: SyncAssetV1;
   [SyncEntityType.PartnerAssetDeleteV1]: SyncAssetDeleteV1;
   [SyncEntityType.PartnerAssetExifV1]: SyncAssetExifV1;
+  [SyncEntityType.AlbumV1]: SyncAlbumV1;
+  [SyncEntityType.AlbumDeleteV1]: SyncAlbumDeleteV1;
 };
 
 const responseDtos = [
-  //
   SyncUserV1,
   SyncUserDeleteV1,
   SyncPartnerV1,
@@ -134,6 +152,8 @@ const responseDtos = [
   SyncAssetV1,
   SyncAssetDeleteV1,
   SyncAssetExifV1,
+  SyncAlbumV1,
+  SyncAlbumDeleteV1,
 ];
 
 export const extraSyncModels = responseDtos;

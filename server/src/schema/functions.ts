@@ -23,6 +23,19 @@ export const immich_uuid_v7 = registerFunction({
   synchronize: false,
 });
 
+export const album_after_insert = registerFunction({
+  name: 'album_after_insert',
+  returnType: 'TRIGGER',
+  language: 'PLPGSQL',
+  body: `
+    BEGIN
+      INSERT INTO users_audit ("userId")
+      SELECT "id"
+      FROM OLD;
+      RETURN NULL;
+    END`,
+});
+
 export const updated_at = registerFunction({
   name: 'updated_at',
   returnType: 'TRIGGER',

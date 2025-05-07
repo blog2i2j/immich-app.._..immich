@@ -1,5 +1,5 @@
 import { AuthDto } from 'src/dtos/auth.dto';
-import { SyncEntityType, SyncRequestType } from 'src/enum';
+import { AlbumUserRole, SyncEntityType, SyncRequestType } from 'src/enum';
 import { SYNC_TYPES_ORDER, SyncService } from 'src/services/sync.service';
 import { mediumFactory, newMediumService } from 'test/medium.factory';
 import { factory } from 'test/small.factory';
@@ -907,4 +907,124 @@ describe(SyncService.name, () => {
       await expect(testSync(auth, [SyncRequestType.PartnerAssetExifsV1])).resolves.toHaveLength(0);
     });
   });
+
+  describe.concurrent(SyncRequestType.AlbumsV1, () => {
+    it('should sync an album with the correct properties', async () => {
+      const { auth, getRepository, testSync } = await setup();
+      const albumRepo = getRepository('album');
+      const album = mediumFactory.albumInsert({ ownerId: auth.user.id });
+      await albumRepo.create(album, [], []);
+      await expect(testSync(auth, [SyncRequestType.AlbumsV1])).resolves.toEqual([
+        {
+          ack: expect.any(String),
+          data: expect.objectContaining({
+            id: album.id,
+            name: album.albumName,
+            ownerId: album.ownerId,
+          }),
+          type: SyncEntityType.AlbumV1,
+        },
+      ]);
+    });
+
+    it('should detect and sync a new album', async () => {
+      const { auth, getRepository, testSync } = await setup();
+      const albumRepo = getRepository('album');
+      const album = mediumFactory.albumInsert({ ownerId: auth.user.id });
+      await albumRepo.create(album, [], []);
+      await expect(testSync(auth, [SyncRequestType.AlbumsV1])).resolves.toEqual([
+        {
+          ack: expect.any(String),
+          data: expect.objectContaining({
+            id: album.id,
+          }),
+          type: SyncEntityType.AlbumV1,
+        },
+      ]);
+    });
+
+    describe('shared albums', () => {
+      it('should detect and sync an album create', async () => {
+        const { auth, getRepository, testSync } = await setup();
+        const albumRepo = getRepository('album');
+        const userRepo = getRepository('user');
+
+        const user2 = mediumFactory.userInsert();
+        await userRepo.create(user2);
+
+        const album = mediumFactory.albumInsert({ ownerId: user2.id });
+        await albumRepo.create(album, [], [{ userId: auth.user.id, role: AlbumUserRole.EDITOR }]);
+
+        await expect(testSync(auth, [SyncRequestType.AlbumsV1])).resolves.toEqual([
+          {
+            ack: expect.any(String),
+            data: expect.objectContaining({ id: album.id }),
+            type: SyncEntityType.AlbumV1,
+          },
+        ]);
+      });
+
+      it('should detect and sync an recently shared album', async () => {
+        const { auth, getRepository, testSync } = await setup();
+        const albumRepo = getRepository('album');
+        const albumUserRepo = getRepository('albumUser');
+        const userRepo = getRepository('user');
+
+        const user2 = mediumFactory.userInsert();
+        await userRepo.create(user2);
+
+        const album = mediumFactory.albumInsert({ ownerId: user2.id });
+        await albumRepo.create(album, [], []);
+        await albumUserRepo.create({ usersId: auth.user.id, albumsId: album.id, role: AlbumUserRole.EDITOR });
+
+        await expect(testSync(auth, [SyncRequestType.AlbumsV1])).resolves.toEqual([
+          {
+            ack: expect.any(String),
+            data: expect.objectContaining({ id: album.id }),
+            type: SyncEntityType.AlbumV1,
+          },
+        ]);
+      });
+
+      it('should handle sharing an album that was created before the last the sync', async () => {
+        const { auth, getRepository, sut, testSync } = await setup();
+        const albumRepo = getRepository('album');
+        const albumUserRepo = getRepository('albumUser');
+        const userRepo = getRepository('user');
+
+        const user2 = mediumFactory.userInsert();
+        await userRepo.create(user2);
+
+        const userAlbum = mediumFactory.albumInsert({ ownerId: auth.user.id });
+        const user2Album = mediumFactory.albumInsert({ ownerId: user2.id });
+        await Promise.all([albumRepo.create(user2Album, [], []), albumRepo.create(userAlbum, [], [])]);
+
+        const initialSyncResponse = await testSync(auth, [SyncRequestType.AlbumsV1]);
+
+        expect(initialSyncResponse).toEqual([
+          {
+            ack: expect.any(String),
+            data: expect.objectContaining({ id: userAlbum.id }),
+            type: SyncEntityType.AlbumV1,
+          },
+        ]);
+
+        const acks = [initialSyncResponse[0].ack];
+        await sut.setAcks(auth, { acks });
+
+        await albumUserRepo.create({ usersId: auth.user.id, albumsId: user2Album.id, role: AlbumUserRole.EDITOR });
+
+        await expect(testSync(auth, [SyncRequestType.AlbumsV1])).resolves.toEqual([
+          {
+            ack: expect.any(String),
+            data: expect.objectContaining({ id: user2Album.id }),
+            type: SyncEntityType.AlbumV1,
+          },
+        ]);
+      });
+    });
+  });
+
+  // describe.concurrent(SyncRequestType.AlbumsV1, () => {
+  // });
 });
