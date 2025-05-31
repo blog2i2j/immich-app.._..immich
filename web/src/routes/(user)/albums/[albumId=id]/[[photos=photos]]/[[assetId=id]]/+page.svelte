@@ -22,6 +22,7 @@
   import FavoriteAction from '$lib/components/photos-page/actions/favorite-action.svelte';
   import RemoveFromAlbum from '$lib/components/photos-page/actions/remove-from-album.svelte';
   import SelectAllAssets from '$lib/components/photos-page/actions/select-all-assets.svelte';
+  import SetVisibilityAction from '$lib/components/photos-page/actions/set-visibility-action.svelte';
   import TagAction from '$lib/components/photos-page/actions/tag-action.svelte';
   import AssetGrid from '$lib/components/photos-page/asset-grid.svelte';
   import AssetSelectControlBar from '$lib/components/photos-page/asset-select-control-bar.svelte';
@@ -43,6 +44,7 @@
   import { AssetInteraction } from '$lib/stores/asset-interaction.svelte';
   import { assetViewingStore } from '$lib/stores/asset-viewing.store';
   import { AssetStore } from '$lib/stores/assets-store.svelte';
+  import { featureFlags } from '$lib/stores/server-config.store';
   import { SlideshowNavigation, SlideshowState, slideshowStore } from '$lib/stores/slideshow.store';
   import { preferences, user } from '$lib/stores/user.store';
   import { handlePromiseError, makeSharedLinkUrl } from '$lib/utils';
@@ -173,7 +175,7 @@
     const asset =
       $slideshowNavigation === SlideshowNavigation.Shuffle
         ? await assetStore.getRandomAsset()
-        : assetStore.buckets[0]?.dateGroups[0]?.intersetingAssets[0]?.asset;
+        : assetStore.buckets[0]?.dateGroups[0]?.intersectingAssets[0]?.asset;
     if (asset) {
       handlePromiseError(setAssetId(asset.id).then(() => ($slideshowState = SlideshowState.PlaySlideshow)));
     }
@@ -304,6 +306,11 @@
     } finally {
       viewMode = AlbumPageViewMode.VIEW;
     }
+  };
+
+  const handleSetVisibility = (assetIds: string[]) => {
+    assetStore.removeAssets(assetIds);
+    assetInteraction.clearMultiselect();
   };
 
   const handleRemoveAssets = async (assetIds: string[]) => {
@@ -603,6 +610,7 @@
               />
             {/if}
             <ArchiveAction menuItem unarchive={assetInteraction.isAllArchived} />
+            <SetVisibilityAction menuItem onVisibilitySet={handleSetVisibility} />
           {/if}
 
           {#if $preferences.tags.enabled && assetInteraction.isAllUserOwned}
@@ -643,7 +651,9 @@
               <CircleIconButton title={$t('share')} onclick={handleShare} icon={mdiShareVariantOutline} />
             {/if}
 
-            <AlbumMap {album} />
+            {#if $featureFlags.loaded && $featureFlags.map}
+              <AlbumMap {album} />
+            {/if}
 
             {#if album.assetCount > 0}
               <CircleIconButton title={$t('slideshow')} onclick={handleStartSlideshow} icon={mdiPresentationPlay} />
