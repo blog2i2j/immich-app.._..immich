@@ -10,6 +10,7 @@
   import DownloadAction from '$lib/components/photos-page/actions/download-action.svelte';
   import FavoriteAction from '$lib/components/photos-page/actions/favorite-action.svelte';
   import SelectAllAssets from '$lib/components/photos-page/actions/select-all-assets.svelte';
+  import SetVisibilityAction from '$lib/components/photos-page/actions/set-visibility-action.svelte';
   import TagAction from '$lib/components/photos-page/actions/tag-action.svelte';
   import AssetGrid from '$lib/components/photos-page/asset-grid.svelte';
   import AssetSelectControlBar from '$lib/components/photos-page/asset-select-control-bar.svelte';
@@ -17,7 +18,7 @@
   import EmptyPlaceholder from '$lib/components/shared-components/empty-placeholder.svelte';
   import { AssetAction } from '$lib/constants';
   import { AssetInteraction } from '$lib/stores/asset-interaction.svelte';
-  import { AssetStore } from '$lib/stores/assets-store.svelte';
+  import { AssetStore } from '$lib/managers/timeline-manager/asset-store.svelte';
   import { preferences } from '$lib/stores/user.store';
   import { mdiDotsVertical, mdiPlus } from '@mdi/js';
   import { onDestroy } from 'svelte';
@@ -41,6 +42,11 @@
       assetInteraction.clearMultiselect();
       return;
     }
+  };
+
+  const handleSetVisibility = (assetIds: string[]) => {
+    assetStore.removeAssets(assetIds);
+    assetInteraction.clearMultiselect();
   };
 </script>
 
@@ -85,7 +91,12 @@
       {#if $preferences.tags.enabled}
         <TagAction menuItem />
       {/if}
-      <DeleteAssets menuItem onAssetDelete={(assetIds) => assetStore.removeAssets(assetIds)} />
+      <SetVisibilityAction menuItem onVisibilitySet={handleSetVisibility} />
+      <DeleteAssets
+        menuItem
+        onAssetDelete={(assetIds) => assetStore.removeAssets(assetIds)}
+        onUndoDelete={(assets) => assetStore.addAssets(assets)}
+      />
     </ButtonContextMenu>
   </AssetSelectControlBar>
 {/if}

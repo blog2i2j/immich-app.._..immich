@@ -18,6 +18,7 @@
   import DownloadAction from '$lib/components/photos-page/actions/download-action.svelte';
   import FavoriteAction from '$lib/components/photos-page/actions/favorite-action.svelte';
   import SelectAllAssets from '$lib/components/photos-page/actions/select-all-assets.svelte';
+  import SetVisibilityAction from '$lib/components/photos-page/actions/set-visibility-action.svelte';
   import TagAction from '$lib/components/photos-page/actions/tag-action.svelte';
   import AssetGrid from '$lib/components/photos-page/asset-grid.svelte';
   import AssetSelectControlBar from '$lib/components/photos-page/asset-select-control-bar.svelte';
@@ -35,7 +36,8 @@
   import PersonMergeSuggestionModal from '$lib/modals/PersonMergeSuggestionModal.svelte';
   import { AssetInteraction } from '$lib/stores/asset-interaction.svelte';
   import { assetViewingStore } from '$lib/stores/asset-viewing.store';
-  import { AssetStore, type TimelineAsset } from '$lib/stores/assets-store.svelte';
+  import { AssetStore } from '$lib/managers/timeline-manager/asset-store.svelte';
+  import type { TimelineAsset } from '$lib/managers/timeline-manager/types';
   import { locale } from '$lib/stores/preferences.store';
   import { preferences } from '$lib/stores/user.store';
   import { websocketEvents } from '$lib/stores/websocket';
@@ -350,6 +352,11 @@
     await updateAssetCount();
   };
 
+  const handleUndoDeleteAssets = async (assets: TimelineAsset[]) => {
+    assetStore.addAssets(assets);
+    await updateAssetCount();
+  };
+
   let person = $derived(data.person);
 
   let thumbnailData = $derived(getPeopleThumbnailUrl(person));
@@ -359,6 +366,11 @@
       handlePromiseError(updateAssetCount());
     }
   });
+
+  const handleSetVisibility = (assetIds: string[]) => {
+    assetStore.removeAssets(assetIds);
+    assetInteraction.clearMultiselect();
+  };
 </script>
 
 <main
@@ -384,7 +396,7 @@
       {#if viewMode === PersonPageViewMode.VIEW_ASSETS}
         <!-- Person information block -->
         <div
-          class="relative w-fit p-4 sm:px-6"
+          class="relative w-fit p-4 sm:px-6 pt-12"
           use:clickOutside={{
             onOutclick: handleCancelEditName,
             onEscape: handleCancelEditName,
@@ -446,7 +458,7 @@
             {/if}
           </section>
           {#if isEditingName}
-            <div class="absolute w-64 sm:w-96">
+            <div class="absolute w-64 sm:w-96 z-1">
               {#if isSearchingPeople}
                 <div
                   class="flex border h-14 rounded-b-lg border-gray-400 dark:border-immich-dark-gray place-items-center bg-gray-200 p-2 dark:bg-gray-700"
@@ -525,7 +537,12 @@
         {#if $preferences.tags.enabled && assetInteraction.isAllUserOwned}
           <TagAction menuItem />
         {/if}
-        <DeleteAssets menuItem onAssetDelete={(assetIds) => handleDeleteAssets(assetIds)} />
+        <SetVisibilityAction menuItem onVisibilitySet={handleSetVisibility} />
+        <DeleteAssets
+          menuItem
+          onAssetDelete={(assetIds) => handleDeleteAssets(assetIds)}
+          onUndoDelete={(assets) => handleUndoDeleteAssets(assets)}
+        />
       </ButtonContextMenu>
     </AssetSelectControlBar>
   {:else}

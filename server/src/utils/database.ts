@@ -153,17 +153,12 @@ export function toJson<DB, TB extends keyof DB & string, T extends TB | Expressi
 }
 
 export const ASSET_CHECKSUM_CONSTRAINT = 'UQ_assets_owner_checksum';
-// TODO come up with a better query that only selects the fields we need
 
 export function withDefaultVisibility<O>(qb: SelectQueryBuilder<DB, 'assets', O>) {
-  return qb.where((qb) =>
-    qb.or([
-      qb('assets.visibility', '=', AssetVisibility.TIMELINE),
-      qb('assets.visibility', '=', AssetVisibility.ARCHIVE),
-    ]),
-  );
+  return qb.where('assets.visibility', 'in', [sql.lit(AssetVisibility.ARCHIVE), sql.lit(AssetVisibility.TIMELINE)]);
 }
 
+// TODO come up with a better query that only selects the fields we need
 export function withExif<O>(qb: SelectQueryBuilder<DB, 'assets', O>) {
   return qb
     .leftJoin('exif', 'assets.id', 'exif.assetId')
@@ -296,7 +291,6 @@ export function searchAssetBuilder(kysely: Kysely<DB>, options: AssetSearchBuild
   return kysely
     .withPlugin(joinDeduplicationPlugin)
     .selectFrom('assets')
-    .selectAll('assets')
     .where('assets.visibility', '=', visibility)
     .$if(!!options.tagIds && options.tagIds.length > 0, (qb) => hasTags(qb, options.tagIds!))
     .$if(!!options.personIds && options.personIds.length > 0, (qb) => hasPeople(qb, options.personIds!))
