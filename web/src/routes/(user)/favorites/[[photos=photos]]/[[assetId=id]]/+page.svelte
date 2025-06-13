@@ -10,14 +10,15 @@
   import DownloadAction from '$lib/components/photos-page/actions/download-action.svelte';
   import FavoriteAction from '$lib/components/photos-page/actions/favorite-action.svelte';
   import SelectAllAssets from '$lib/components/photos-page/actions/select-all-assets.svelte';
+  import SetVisibilityAction from '$lib/components/photos-page/actions/set-visibility-action.svelte';
   import TagAction from '$lib/components/photos-page/actions/tag-action.svelte';
   import AssetGrid from '$lib/components/photos-page/asset-grid.svelte';
   import AssetSelectControlBar from '$lib/components/photos-page/asset-select-control-bar.svelte';
   import ButtonContextMenu from '$lib/components/shared-components/context-menu/button-context-menu.svelte';
   import EmptyPlaceholder from '$lib/components/shared-components/empty-placeholder.svelte';
   import { AssetAction } from '$lib/constants';
+  import { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
   import { AssetInteraction } from '$lib/stores/asset-interaction.svelte';
-  import { AssetStore } from '$lib/stores/assets-store.svelte';
   import { preferences } from '$lib/stores/user.store';
   import { mdiDotsVertical, mdiPlus } from '@mdi/js';
   import { onDestroy } from 'svelte';
@@ -30,9 +31,9 @@
 
   let { data }: Props = $props();
 
-  const assetStore = new AssetStore();
-  void assetStore.updateOptions({ isFavorite: true, withStacked: true });
-  onDestroy(() => assetStore.destroy());
+  const timelineManager = new TimelineManager();
+  void timelineManager.updateOptions({ isFavorite: true, withStacked: true });
+  onDestroy(() => timelineManager.destroy());
 
   const assetInteraction = new AssetInteraction();
 
@@ -42,13 +43,18 @@
       return;
     }
   };
+
+  const handleSetVisibility = (assetIds: string[]) => {
+    timelineManager.removeAssets(assetIds);
+    assetInteraction.clearMultiselect();
+  };
 </script>
 
 <UserPageLayout hideNavbar={assetInteraction.selectionActive} title={data.meta.title} scrollbar={false}>
   <AssetGrid
     enableRouting={true}
     withStacked={true}
-    {assetStore}
+    {timelineManager}
     {assetInteraction}
     removeAction={AssetAction.UNFAVORITE}
     onEscape={handleEscape}
@@ -65,9 +71,9 @@
     assets={assetInteraction.selectedAssets}
     clearSelect={() => assetInteraction.clearMultiselect()}
   >
-    <FavoriteAction removeFavorite onFavorite={(assetIds) => assetStore.removeAssets(assetIds)} />
+    <FavoriteAction removeFavorite onFavorite={(assetIds) => timelineManager.removeAssets(assetIds)} />
     <CreateSharedLink />
-    <SelectAllAssets {assetStore} {assetInteraction} />
+    <SelectAllAssets {timelineManager} {assetInteraction} />
     <ButtonContextMenu icon={mdiPlus} title={$t('add_to')}>
       <AddToAlbum />
       <AddToAlbum shared />
@@ -80,12 +86,17 @@
       <ArchiveAction
         menuItem
         unarchive={assetInteraction.isAllArchived}
-        onArchive={(assetIds) => assetStore.removeAssets(assetIds)}
+        onArchive={(assetIds) => timelineManager.removeAssets(assetIds)}
       />
       {#if $preferences.tags.enabled}
         <TagAction menuItem />
       {/if}
-      <DeleteAssets menuItem onAssetDelete={(assetIds) => assetStore.removeAssets(assetIds)} />
+      <SetVisibilityAction menuItem onVisibilitySet={handleSetVisibility} />
+      <DeleteAssets
+        menuItem
+        onAssetDelete={(assetIds) => timelineManager.removeAssets(assetIds)}
+        onUndoDelete={(assets) => timelineManager.addAssets(assets)}
+      />
     </ButtonContextMenu>
   </AssetSelectControlBar>
 {/if}

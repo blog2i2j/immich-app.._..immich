@@ -16,6 +16,58 @@ ENV PATH="${PATH}:/usr/src/app/bin" \
     NVIDIA_VISIBLE_DEVICES=all
 ENTRYPOINT ["tini", "--", "/bin/sh"]
 
+FROM dev AS dev-container-server
+
+RUN apt-get update && \
+    apt-get install sudo inetutils-ping openjdk-11-jre-headless \
+    vim nano \
+    -y --no-install-recommends --fix-missing
+
+RUN usermod -aG sudo node
+RUN echo "node ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+RUN mkdir -p /workspaces/immich
+RUN chown node -R /workspaces
+
+RUN mkdir /immich-devcontainer && chown node -R /immich-devcontainer
+COPY --chmod=777 ../.devcontainer/server/*.sh /immich-devcontainer/
+
+FROM dev-container-server AS dev-container-mobile
+
+# Enable multiarch for arm64 if necessary
+RUN if [ "$(dpkg --print-architecture)" = "arm64" ]; then \
+    dpkg --add-architecture amd64 && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        qemu-user-static \
+        libc6:amd64 \
+        libstdc++6:amd64 \
+        libgcc1:amd64; \
+    fi
+
+# Flutter SDK
+# https://flutter.dev/docs/development/tools/sdk/releases?tab=linux
+ENV FLUTTER_CHANNEL="stable"
+ENV FLUTTER_VERSION="3.29.3"
+ENV FLUTTER_HOME=/flutter
+ENV PATH=${PATH}:${FLUTTER_HOME}/bin
+
+# Flutter SDK
+RUN mkdir -p ${FLUTTER_HOME} \
+  && curl -C - --output flutter.tar.xz https://storage.googleapis.com/flutter_infra_release/releases/${FLUTTER_CHANNEL}/linux/flutter_linux_${FLUTTER_VERSION}-${FLUTTER_CHANNEL}.tar.xz \
+  && tar -xf flutter.tar.xz --strip-components=1 -C ${FLUTTER_HOME} \
+  && rm flutter.tar.xz \
+  && chown -R node ${FLUTTER_HOME}
+
+USER node
+RUN sudo apt-get update \
+  && wget -qO- https://dcm.dev/pgp-key.public | sudo gpg --dearmor -o /usr/share/keyrings/dcm.gpg \
+  && echo 'deb [signed-by=/usr/share/keyrings/dcm.gpg arch=amd64] https://dcm.dev/debian stable main' | sudo tee /etc/apt/sources.list.d/dart_stable.list \
+  && sudo apt-get update \
+  && sudo apt-get install dcm -y
+
+COPY --chmod=777 ../.devcontainer/mobile/container-mobile-post-create.sh /immich-devcontainer/container-mobile-post-create.sh
+
+RUN dart --disable-analytics
 
 FROM dev AS prod
 
@@ -26,7 +78,7 @@ COPY --from=dev /usr/src/app/node_modules/@img ./node_modules/@img
 COPY --from=dev /usr/src/app/node_modules/exiftool-vendored.pl ./node_modules/exiftool-vendored.pl
 
 # web build
-FROM node:22.15.0-alpine3.20@sha256:686b8892b69879ef5bfd6047589666933508f9a5451c67320df3070ba0e9807b AS web
+FROM node:22.16.0-alpine3.20@sha256:2289fb1fba0f4633b08ec47b94a89c7e20b829fc5679f9b7b298eaa2f1ed8b7e AS web
 
 WORKDIR /usr/src/open-api/typescript-sdk
 COPY open-api/typescript-sdk/package*.json open-api/typescript-sdk/tsconfig*.json ./
