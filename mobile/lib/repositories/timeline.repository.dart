@@ -72,7 +72,12 @@ class TimelineRepository extends DatabaseRepository
     Album album,
     GroupAssetsBy groupAssetByOption,
   ) {
-    final query = album.assets.filter().isTrashedEqualTo(false);
+    final query = album.assets
+        .filter()
+        .isTrashedEqualTo(false)
+        .not()
+        .visibilityEqualTo(AssetVisibilityEnum.locked);
+
     final withSortedOption = switch (album.sortOrder) {
       SortOrder.asc => query.sortByFileCreatedAt(),
       SortOrder.desc => query.sortByFileCreatedAtDesc(),
@@ -93,8 +98,10 @@ class TimelineRepository extends DatabaseRepository
   }
 
   @override
-  Stream<RenderList> watchAllVideosTimeline() {
+  Stream<RenderList> watchAllVideosTimeline(String userId) {
     final query = db.assets
+        .where()
+        .ownerIdEqualToAnyChecksum(fastHash(userId))
         .filter()
         .isTrashedEqualTo(false)
         .visibilityEqualTo(AssetVisibilityEnum.timeline)
