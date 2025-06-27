@@ -49,7 +49,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Flutter SDK
-        uses: subosito/flutter-action@e938fdf56512cc96ef2f93601a5a40bde3801046 # v2.19.0
+        uses: subosito/flutter-action@395322a6cded4e9ed503aebd4cc1965625f8e59a # v2.20.0
         with:
           channel: 'stable'
           flutter-version-file: ./mobile/pubspec.yaml
@@ -58,12 +58,24 @@ jobs:
         run: dart pub get
         working-directory: ./mobile
 
+      - name: Install DCM
+        run: |
+          sudo apt-get update
+          wget -qO- https://dcm.dev/pgp-key.public | sudo gpg --dearmor -o /usr/share/keyrings/dcm.gpg
+          echo 'deb [signed-by=/usr/share/keyrings/dcm.gpg arch=amd64] https://dcm.dev/debian stable main' | sudo tee /etc/apt/sources.list.d/dart_stable.list
+          sudo apt-get update
+          sudo apt-get install dcm
+
       - name: Generate translation file
-        run: make translation; dart format lib/generated/codegen_loader.g.dart
+        run: make translation
         working-directory: ./mobile
 
       - name: Run Build Runner
         run: make build
+        working-directory: ./mobile
+
+      - name: Generate platform API
+        run: make pigeon
         working-directory: ./mobile
 
       - name: Find file changes
@@ -96,6 +108,10 @@ jobs:
         run: dart run custom_lint
         working-directory: ./mobile
 
+      - name: Run DCM
+        run: dcm analyze lib --fatal-style --fatal-warnings
+        working-directory: ./mobile
+
   zizmor:
     name: zizmor
     runs-on: ubuntu-latest
@@ -118,7 +134,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@60168efe1c415ce0f5521ea06d5c2062adbeed1b # v3.28.17
+        uses: github/codeql-action/upload-sarif@ce28f5bb42b7a9f2c824e633a3f6ee835bab6858 # v3.29.0
         with:
           sarif_file: results.sarif
           category: zizmor

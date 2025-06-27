@@ -1,26 +1,22 @@
 import { goto } from '$app/navigation';
-import FormatBoldMessage from '$lib/components/i18n/format-bold-message.svelte';
-import type { InterpolationValues } from '$lib/components/i18n/format-message';
 import { notificationController, NotificationType } from '$lib/components/shared-components/notification/notification';
 import { AppRoute } from '$lib/constants';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import { downloadManager } from '$lib/managers/download-manager.svelte';
+import type { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
+import type { TimelineAsset } from '$lib/managers/timeline-manager/types';
+import { assetsSnapshot } from '$lib/managers/timeline-manager/utils.svelte';
 import type { AssetInteraction } from '$lib/stores/asset-interaction.svelte';
-import {
-  assetsSnapshot,
-  isSelectingAllAssets,
-  type AssetStore,
-  type TimelineAsset,
-} from '$lib/stores/assets-store.svelte';
+import { isSelectingAllAssets } from '$lib/stores/assets-store.svelte';
 import { preferences } from '$lib/stores/user.store';
 import { downloadRequest, withError } from '$lib/utils';
-import { createAlbum } from '$lib/utils/album-utils';
 import { getByteUnitString } from '$lib/utils/byte-units';
 import { getFormatter } from '$lib/utils/i18n';
 import { navigate } from '$lib/utils/navigation';
 import {
   addAssetsToAlbum as addAssets,
   AssetVisibility,
+  bulkTagAssets,
   createStack,
   deleteAssets,
   deleteStacks,
@@ -28,7 +24,6 @@ import {
   getBaseUrl,
   getDownloadInfo,
   getStack,
-  tagAssets as tagAllAssets,
   untagAssets,
   updateAsset,
   updateAssets,
@@ -41,7 +36,7 @@ import {
   type UserResponseDto,
 } from '@immich/sdk';
 import { DateTime } from 'luxon';
-import { t, type Translations } from 'svelte-i18n';
+import { t } from 'svelte-i18n';
 import { get } from 'svelte/store';
 import { handleError } from './handle-error';
 
@@ -54,16 +49,20 @@ export const addAssetsToAlbum = async (albumId: string, assetIds: string[], show
     key: authManager.key,
   });
   const count = result.filter(({ success }) => success).length;
+  const duplicateErrorCount = result.filter(({ error }) => error === 'duplicate').length;
   const $t = get(t);
 
   if (showNotification) {
+    let message = $t('assets_cannot_be_added_to_album_count', { values: { count: assetIds.length } });
+    if (count > 0) {
+      message = $t('assets_added_to_album_count', { values: { count } });
+    } else if (duplicateErrorCount > 0) {
+      message = $t('assets_were_part_of_album_count', { values: { count: duplicateErrorCount } });
+    }
     notificationController.show({
       type: NotificationType.Info,
       timeout: 5000,
-      message:
-        count > 0
-          ? $t('assets_added_to_album_count', { values: { count } })
-          : $t('assets_were_part_of_album_count', { values: { count: assetIds.length } }),
+      message,
       button: {
         text: $t('view_album'),
         onClick() {
@@ -83,9 +82,7 @@ export const tagAssets = async ({
   tagIds: string[];
   showNotification?: boolean;
 }) => {
-  for (const tagId of tagIds) {
-    await tagAllAssets({ id: tagId, bulkIdsDto: { ids: assetIds } });
-  }
+  await bulkTagAssets({ tagBulkAssetsDto: { tagIds, assetIds } });
 
   if (showNotification) {
     const $t = await getFormatter();
@@ -120,33 +117,6 @@ export const removeTag = async ({
   }
 
   return assetIds;
-};
-
-export const addAssetsToNewAlbum = async (albumName: string, assetIds: string[]) => {
-  const album = await createAlbum(albumName, assetIds);
-  if (!album) {
-    return;
-  }
-  const $t = get(t);
-  // for reasons beyond me <ComponentProps<typeof FormatBoldMessage>> doesn't work, even though it's (afaik) exactly this object
-  notificationController.show<{ key: Translations; values: InterpolationValues }>({
-    type: NotificationType.Info,
-    timeout: 5000,
-    component: {
-      type: FormatBoldMessage,
-      props: {
-        key: 'assets_added_to_name_count',
-        values: { count: assetIds.length, name: albumName, hasName: !!albumName },
-      },
-    },
-    button: {
-      text: $t('view_album'),
-      onClick() {
-        return goto(`${AppRoute.ALBUMS}/${album.id}`);
-      },
-    },
-  });
-  return album;
 };
 
 export const downloadAlbum = async (album: AlbumResponseDto) => {
@@ -470,7 +440,7 @@ export const keepThisDeleteOthers = async (keepAsset: AssetResponseDto, stack: S
   }
 };
 
-export const selectAllAssets = async (assetStore: AssetStore, assetInteraction: AssetInteraction) => {
+export const selectAllAssets = async (timelineManager: TimelineManager, assetInteraction: AssetInteraction) => {
   if (get(isSelectingAllAssets)) {
     // Selection is already ongoing
     return;
@@ -478,16 +448,16 @@ export const selectAllAssets = async (assetStore: AssetStore, assetInteraction: 
   isSelectingAllAssets.set(true);
 
   try {
-    for (const bucket of assetStore.buckets) {
-      await assetStore.loadBucket(bucket.bucketDate);
+    for (const monthGroup of timelineManager.months) {
+      await timelineManager.loadMonthGroup(monthGroup.yearMonth);
 
       if (!get(isSelectingAllAssets)) {
         assetInteraction.clearMultiselect();
         break; // Cancelled
       }
-      assetInteraction.selectAssets(assetsSnapshot(bucket.getAssets()));
+      assetInteraction.selectAssets(assetsSnapshot([...monthGroup.assetsIterator()]));
 
-      for (const dateGroup of bucket.dateGroups) {
+      for (const dateGroup of monthGroup.dayGroups) {
         assetInteraction.addGroupToMultiselectGroup(dateGroup.groupTitle);
       }
     }
