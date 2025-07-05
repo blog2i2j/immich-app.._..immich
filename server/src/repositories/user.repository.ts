@@ -4,14 +4,15 @@ import { jsonArrayFrom } from 'kysely/helpers/postgres';
 import { DateTime } from 'luxon';
 import { InjectKysely } from 'nestjs-kysely';
 import { columns } from 'src/database';
-import { DB, UserMetadata as DbUserMetadata } from 'src/db';
 import { DummyValue, GenerateSql } from 'src/decorators';
 import { AssetType, AssetVisibility, UserStatus } from 'src/enum';
+import { DB } from 'src/schema';
+import { UserMetadataTable } from 'src/schema/tables/user-metadata.table';
 import { UserTable } from 'src/schema/tables/user.table';
 import { UserMetadata, UserMetadataItem } from 'src/types';
 import { asUuid } from 'src/utils/database';
 
-type Upsert = Insertable<DbUserMetadata>;
+type Upsert = Insertable<UserMetadataTable>;
 
 export interface UserListFilter {
   id?: string;
@@ -95,6 +96,16 @@ export class UserRepository {
     return this.db
       .selectFrom('users')
       .select(['users.pinCode', 'users.password'])
+      .where('users.id', '=', id)
+      .where('users.deletedAt', 'is', null)
+      .executeTakeFirstOrThrow();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getForChangePassword(id: string) {
+    return this.db
+      .selectFrom('users')
+      .select(['users.id', 'users.password'])
       .where('users.id', '=', id)
       .where('users.deletedAt', 'is', null)
       .executeTakeFirstOrThrow();
@@ -210,9 +221,9 @@ export class UserRepository {
   getUserStats() {
     return this.db
       .selectFrom('users')
-      .leftJoin('assets', 'assets.ownerId', 'users.id')
+      .leftJoin('assets', (join) => join.onRef('assets.ownerId', '=', 'users.id').on('assets.deletedAt', 'is', null))
       .leftJoin('exif', 'exif.assetId', 'assets.id')
-      .select(['users.id as userId', 'users.name as userName', 'users.quotaSizeInBytes as quotaSizeInBytes'])
+      .select(['users.id as userId', 'users.name as userName', 'users.quotaSizeInBytes'])
       .select((eb) => [
         eb.fn
           .countAll<number>()
@@ -256,7 +267,6 @@ export class UserRepository {
           )
           .as('usageVideos'),
       ])
-      .where('assets.deletedAt', 'is', null)
       .groupBy('users.id')
       .orderBy('users.createdAt', 'asc')
       .execute();
