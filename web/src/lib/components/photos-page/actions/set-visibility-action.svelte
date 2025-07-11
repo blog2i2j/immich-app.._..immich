@@ -26,6 +26,7 @@
       prompt: unlock ? $t('remove_from_locked_folder_confirmation') : $t('move_to_locked_folder_confirmation'),
       confirmText: $t('move'),
       confirmColor: unlock ? 'danger' : 'primary',
+      icon: unlock ? mdiLockOpenVariantOutline : mdiLockOutline,
     });
 
     if (!isConfirmed) {
@@ -55,7 +56,7 @@
 {#if menuItem}
   <MenuOption
     onClick={setLockedVisibility}
-    text={unlock ? $t('move_off_locked_folder') : $t('add_to_locked_folder')}
+    text={unlock ? $t('move_off_locked_folder') : $t('move_to_locked_folder')}
     icon={unlock ? mdiLockOpenVariantOutline : mdiLockOutline}
   />
 {:else}
@@ -67,6 +68,6 @@
     variant="ghost"
     onclick={setLockedVisibility}
   >
-    {unlock ? $t('move_off_locked_folder') : $t('add_to_locked_folder')}
+    {unlock ? $t('move_off_locked_folder') : $t('move_to_locked_folder')}
   </Button>
 {/if}
